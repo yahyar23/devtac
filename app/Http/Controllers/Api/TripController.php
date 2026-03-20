@@ -17,7 +17,7 @@ class TripController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'pickup_location'  => 'required|string',
             'pickup_lat'       => 'required|numeric',
             'pickup_long'      => 'required|numeric',
@@ -26,6 +26,10 @@ class TripController extends Controller
             'dropoff_long'     => 'required|numeric',
             'fare'             => 'required|numeric',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
         $trip = Trip::create([
             'customer_id'      => Auth::id(),
@@ -48,10 +52,21 @@ class TripController extends Controller
 
     /**
      * 2. قبول الرحلة (السائق)
+     * تم دمج منطق الـ 60 ثانية لضمان جودة الطلبات
      */
     public function acceptTrip(Request $request, $id)
     {
-        $trip = Trip::findOrFail($id);
+        $trip = Trip::find($id);
+
+        if (!$trip) {
+            return response()->json(['message' => 'عذراً، الرحلة غير موجودة'], 404);
+        }
+
+        // منع قبول الرحلات التي مر عليها أكثر من دقيقة لضمان عدم انتظار الزبون طويلاً
+        if ($trip->status === 'pending' && $trip->created_at->diffInSeconds(now()) > 60) {
+            $trip->delete(); 
+            return response()->json(['message' => 'عذراً، هذه الرحلة انتهت صلاحيتها'], 410);
+        }
 
         if ($trip->status !== 'pending') {
             return response()->json(['message' => 'عذراً، هذه الرحلة لم تعد متاحة'], 422);
@@ -65,8 +80,26 @@ class TripController extends Controller
 
         return response()->json([
             'message' => 'تم قبول الرحلة بنجاح',
-            'trip' => $trip->load('customer') 
+            'trip' => $trip->load(['customer', 'driver']) 
         ]);
+    }
+
+    /**
+     * إلغاء الرحلة من قبل الزبون عند تأخر السائق (Timeout)
+     */
+    public function timeoutCancel($id)
+    {
+        $trip = Trip::where('id', $id)
+                    ->where('customer_id', Auth::id())
+                    ->where('status', 'pending')
+                    ->first();
+
+        if ($trip) {
+            $trip->delete();
+            return response()->json(['message' => 'تم إلغاء طلبك لعدم توفر كابتن قريب']);
+        }
+
+        return response()->json(['message' => 'لا يمكن الإلغاء حالياً'], 400);
     }
 
     /**
@@ -93,11 +126,10 @@ class TripController extends Controller
     }
 
     /**
-     * 4. إنهاء الرحلة (تم التعديل لإزالة إجبارية الـ amount وحل خطأ 422)
+     * 4. إنهاء الرحلة وخصم العمولة (12%)
      */
     public function completeTrip(Request $request, $id)
     {
-        // نجلب الرحلة مع السائق للتأكد من البيانات
         $trip = Trip::where('id', $id)->where('driver_id', Auth::id())->firstOrFail();
         
         if ($trip->status === 'completed') {
@@ -105,13 +137,13 @@ class TripController extends Controller
         }
 
         return DB::transaction(function () use ($trip, $request) {
-            $driver = Auth::user();
+            $user = Auth::user();
             
-            // نأخذ المبلغ من الرحلة نفسها إذا لم يرسله التطبيق
+            // استخدام المبلغ المرسل أو المسجل مسبقاً
             $finalFare = $request->amount ?? $trip->fare; 
-            $commission = $finalFare * 0.12; // عمولة 12%
+            $commission = $finalFare * 0.12; 
 
-            // تحديث بيانات الرحلة
+            // تحديث بيانات الرحلة النهائية
             $trip->update([
                 'status'   => 'completed',
                 'ended_at' => now(),
@@ -119,28 +151,30 @@ class TripController extends Controller
                 'is_paid'  => true
             ]);
 
-            // خصم العمولة من رصيد السائق (لأن السائق استلم الكاش من الزبون)
-            // الرصيد هنا يمثل ديون الشركة بذمة السائق أو محفظته الإلكترونية
-            if ($driver) {
-                $driver->decrement('balance', $commission);
+            // خصم العمولة من رصيد السائق (تحويلها لدين)
+            // ملاحظة: الحقل balance يجب أن يكون من نوع decimal في قاعدة البيانات
+            if ($user) {
+                $user->decrement('balance', $commission);
             }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'تم إنهاء الرحلة بنجاح، خصم عمولة الشركة (12%)',
+                'message' => 'تم إنهاء الرحلة بنجاح، تم قيد عمولة الشركة بذمتكم',
                 'fare' => $finalFare,
                 'commission_deducted' => $commission,
-                'new_balance' => $driver->fresh()->balance ?? 0
+                'new_balance' => $user->fresh()->balance ?? 0
             ]);
         });
     }
 
     /**
-     * 5. الرحلات المتاحة
+     * 5. الرحلات المتاحة (للرادار)
+     * تظهر فقط الرحلات الحديثة (أقل من 60 ثانية)
      */
     public function availableTrips()
     {
         $trips = Trip::where('status', 'pending')
+                     ->where('created_at', '>=', now()->subSeconds(60))
                      ->with('customer:id,name,phone') 
                      ->latest()
                      ->get();
@@ -149,16 +183,52 @@ class TripController extends Controller
     }
 
     /**
-     * 6. تفاصيل الرحلة
+     * 6. تفاصيل الرحلة للتحديث اللحظي في فلاتر
      */
     public function show($id)
     {
-        $trip = Trip::with(['customer', 'driver'])->findOrFail($id);
+        $trip = Trip::with([
+            'customer:id,name,phone', 
+            'driver:id,name,phone,lat,lng,heading' 
+        ])->find($id);
+
+        if (!$trip) {
+            return response()->json(['message' => 'الرحلة غير موجودة'], 404);
+        }
+
         return response()->json($trip);
     }
 
     /**
-     * 7. الرصيد
+     * 7. تحديث موقع السائق اللحظي (يستدعى كل 5 ثواني من فلاتر)
+     */
+    public function updateLocation(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'lat'     => 'required|numeric',
+            'lng'     => 'required|numeric',
+            'heading' => 'nullable|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = Auth::user();
+        if ($user) {
+            $user->update([
+                'lat'                  => $request->lat,
+                'lng'                  => $request->lng,
+                'heading'              => $request->heading ?? 0,
+                'last_location_update' => now(),
+            ]);
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * 8. جلب الرصيد الحالي
      */
     public function getBalance()
     {

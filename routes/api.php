@@ -39,7 +39,8 @@ Route::get('/profile', function (Request $request) {
         Route::get('/profile', [DriverDetailController::class, 'getProfile']);
         Route::post('/update-status', [DriverDetailController::class, 'updateStatusAndLocation']);
         Route::get('/history', [DriverDetailController::class, 'tripHistory']);
-
+        Route::get('/nearby', [TripController::class, 'nearbyDrivers']);
+        Route::post('/update-location', [TripController::class, 'updateLocation']);
         // --- إضافة مسار الرصيد للسائق (مطلوب لشاشة الكابتن في Flutter) ---
         Route::get('/balance', [TripController::class, 'getBalance']); 
 
@@ -48,6 +49,7 @@ Route::get('/profile', function (Request $request) {
     // --- د. نظام الرحلات الأساسي (Trip System) ---
     Route::prefix('trips')->group(function () {
         Route::get('/available', [TripController::class, 'availableTrips']); 
+        Route::delete('/{id}/timeout-cancel', [TripController::class, 'timeoutCancel']);
         Route::post('/create', [TripController::class, 'store']);            
         Route::get('/{id}', [TripController::class, 'show']); // --- مهم جداً للزبون لمتابعة حالة الكابتن ---
         

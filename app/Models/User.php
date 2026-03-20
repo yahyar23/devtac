@@ -31,6 +31,10 @@ class User extends Authenticatable
     'img_id_back',  // أضف هذا
     'car_color',    // أضف هذا
     'car_plate',
+    'lat',          // أضف هذا
+    'lng',          // أضف هذا
+    'heading',      // أضف هذا
+    'last_location_update', //
     
         ];
 
