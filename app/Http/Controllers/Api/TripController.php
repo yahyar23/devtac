@@ -8,11 +8,12 @@ use App\Models\Trip;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class TripController extends Controller
 {
     /**
-     * 1. طلب رحلة جديدة (يستدعيه الراكب)
+     * 1. طلب رحلة جديدة
      */
     public function store(Request $request)
     {
@@ -38,12 +39,15 @@ class TripController extends Controller
             'status'           => 'pending',
         ]);
 
-        // ملاحظة: هنا يجب إرسال إشعار (Firebase) لجميع السائقين القريبين
-        return response()->json(['message' => 'تم إرسال طلبك، بانتظار قبول سائق', 'trip' => $trip], 201);
+        return response()->json([
+            'message' => 'تم إرسال طلبك بنجاح',
+            'id' => $trip->id,
+            'trip' => $trip
+        ], 201);
     }
 
     /**
-     * 2. قبول الرحلة (يستدعيه السائق)
+     * 2. قبول الرحلة (السائق)
      */
     public function acceptTrip(Request $request, $id)
     {
@@ -59,44 +63,105 @@ class TripController extends Controller
             'started_at' => now(),
         ]);
 
-        return response()->json(['message' => 'تم قبول الرحلة بنجاح', 'trip' => $trip]);
+        return response()->json([
+            'message' => 'تم قبول الرحلة بنجاح',
+            'trip' => $trip->load('customer') 
+        ]);
     }
 
     /**
-     * 3. إنهاء الرحلة ودفع الثمن (يستدعيه السائق عند الوصول)
+     * 3. تحديث الحالة (وصلت / ركب الزبون)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:arrived,ongoing' 
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+        
+        $trip = Trip::where('id', $id)->where('driver_id', Auth::id())->firstOrFail();
+        $trip->update(['status' => $request->status]);
+
+        return response()->json([
+            'message' => 'تم تحديث حالة الرحلة',
+            'status' => $trip->status,
+            'trip' => $trip->load(['customer', 'driver'])
+        ]);
+    }
+
+    /**
+     * 4. إنهاء الرحلة (تم التعديل لإزالة إجبارية الـ amount وحل خطأ 422)
      */
     public function completeTrip(Request $request, $id)
     {
-        $trip = Trip::findOrFail($id);
-        $driver = Auth::user()->driverDetail;
+        // نجلب الرحلة مع السائق للتأكد من البيانات
+        $trip = Trip::where('id', $id)->where('driver_id', Auth::id())->firstOrFail();
+        
+        if ($trip->status === 'completed') {
+            return response()->json(['message' => 'الرحلة مكتملة بالفعل'], 422);
+        }
 
-        return DB::transaction(function () use ($trip, $driver) {
-            // تحديث حالة الرحلة
+        return DB::transaction(function () use ($trip, $request) {
+            $driver = Auth::user();
+            
+            // نأخذ المبلغ من الرحلة نفسها إذا لم يرسله التطبيق
+            $finalFare = $request->amount ?? $trip->fare; 
+            $commission = $finalFare * 0.12; // عمولة 12%
+
+            // تحديث بيانات الرحلة
             $trip->update([
                 'status'   => 'completed',
                 'ended_at' => now(),
+                'fare'     => $finalFare, 
                 'is_paid'  => true
             ]);
 
-            // خصم عمولة الشركة (مثلاً 10%) من محفظة السائق إذا كان الدفع نقداً
-            // أو إضافة الصافي للمحفظة إذا كان الدفع إلكترونياً
-            $commission = $trip->fare * 0.10; 
-            $driver->decrement('wallet_balance', $commission);
+            // خصم العمولة من رصيد السائق (لأن السائق استلم الكاش من الزبون)
+            // الرصيد هنا يمثل ديون الشركة بذمة السائق أو محفظته الإلكترونية
+            if ($driver) {
+                $driver->decrement('balance', $commission);
+            }
 
             return response()->json([
-                'message' => 'تم إنهاء الرحلة وخصم العمولة',
-                'fare' => $trip->fare,
-                'new_balance' => $driver->wallet_balance
+                'status' => 'success',
+                'message' => 'تم إنهاء الرحلة بنجاح، خصم عمولة الشركة (12%)',
+                'fare' => $finalFare,
+                'commission_deducted' => $commission,
+                'new_balance' => $driver->fresh()->balance ?? 0
             ]);
         });
     }
 
     /**
-     * 4. عرض الرحلات المتاحة (للسائقين فقط)
+     * 5. الرحلات المتاحة
      */
     public function availableTrips()
     {
-        $trips = Trip::where('status', 'pending')->with('customer')->latest()->get();
+        $trips = Trip::where('status', 'pending')
+                     ->with('customer:id,name,phone') 
+                     ->latest()
+                     ->get();
+
         return response()->json($trips);
+    }
+
+    /**
+     * 6. تفاصيل الرحلة
+     */
+    public function show($id)
+    {
+        $trip = Trip::with(['customer', 'driver'])->findOrFail($id);
+        return response()->json($trip);
+    }
+
+    /**
+     * 7. الرصيد
+     */
+    public function getBalance()
+    {
+        return response()->json(['balance' => Auth::user()->balance ?? 0]);
     }
 }

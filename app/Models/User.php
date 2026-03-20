@@ -15,6 +15,7 @@ class User extends Authenticatable
     /**
      * الحقول المسموح بتعبئتها (تم دمجها في مصفوفة واحدة)
      */
+  
     protected $fillable = [
         'name',
         'phone',
@@ -24,8 +25,14 @@ class User extends Authenticatable
         'status',
         'avatar',    // أضفناه لعرض الصورة في التطبيق
         'fcm_token', // أضفناه للإشعارات
-        'otp_code',  // أضفناه للتحقق من الهاتف
-    ];
+        'otp_code',  //  للتحقق من الهاتف
+    'img_personal', // أضف هذا
+    'img_id_front', // أضف هذا
+    'img_id_back',  // أضف هذا
+    'car_color',    // أضف هذا
+    'car_plate',
+    
+        ];
 
     /**
      * الحقول المخفية عند إرسال البيانات للـ API (للأمان)
@@ -81,5 +88,15 @@ class User extends Authenticatable
     public function username()
 {
     return 'phone';
+}
+
+// إذا كان المستخدم زبوناً
+public function customerTrips() {
+    return $this->hasMany(Trip::class, 'customer_id');
+}
+
+// إذا كان المستخدم سائقاً
+public function driverTrips() {
+    return $this->hasMany(Trip::class, 'driver_id');
 }
 }

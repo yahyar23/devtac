@@ -16,7 +16,7 @@ class CreateUsersTable extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name'); 
-            
+            $table->decimal('balance', 12, 2)->default(0.00);
             // رقم الهاتف: أهم حقل في تطبيقات التكسي، أضفنا له index لسرعة تسجيل الدخول
             $table->string('phone')->unique()->index(); 
             
