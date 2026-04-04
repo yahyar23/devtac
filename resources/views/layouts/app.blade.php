@@ -7,7 +7,7 @@
     <title>ماي تكسي - لوحة التحكم</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -22,7 +22,7 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16 items-center">
                     <div class="flex items-center">
-                        <span class="text-xl font-bold text-purple-600">🚖 ماي تكسي</span>
+                        <span class="text-xl font-bold text-purple-600">🚖 توصيل البريد السريع</span>
                     </div>
                     
                     {{-- زر تسجيل الخروج --}}

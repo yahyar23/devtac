@@ -35,6 +35,11 @@ class User extends Authenticatable
     'lng',          // أضف هذا
     'heading',      // أضف هذا
     'last_location_update', //
+    'img_car_front', // أضفه هنا
+    'img_car_back',  // أضفه هنا
+    'car_brand',  // أضفه هنا
+    'car_model',  // أضفه هنا
+    'car_year',  // أضفه هنا
     
         ];
 

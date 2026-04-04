@@ -25,6 +25,11 @@ class TripController extends Controller
             'dropoff_lat'      => 'required|numeric',
             'dropoff_long'     => 'required|numeric',
             'fare'             => 'required|numeric',
+            'receiver_name'             => 'required|string',
+            'receiver_phone'             => 'required|string',
+            'item_type'             => 'required|string',
+            'item_price'             => 'required|string',
+            'items_count'             => 'required|string',
         ]);
 
         if ($validator->fails()) {
@@ -40,6 +45,11 @@ class TripController extends Controller
             'dropoff_lat'      => $request->dropoff_lat,
             'dropoff_long'     => $request->dropoff_long,
             'fare'             => $request->fare,
+            'receiver_name'             => $request->receiver_name,
+            'receiver_phone'             => $request->receiver_phone,
+            'item_type'             => $request->item_type,
+            'item_price'             => $request->item_price,
+            'items_count'             => $request->items_count,
             'status'           => 'pending',
         ]);
 

@@ -24,29 +24,42 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'خطأ في البيانات المرسلة',
-                'errors'  => $validator->errors() // هذا سيخبرك بالضبط ما هو الحقل الناقص
+                'errors'  => $validator->errors()
             ], 422);
         }
 
-        // 2. معالجة الصور (جعلناها اختيارية برمجياً لتجنب توقف الكود)
+        // 2. معالجة الصور
         $imgPersonal = $request->hasFile('img_personal') ? $request->file('img_personal')->store('drivers', 'public') : null;
         $imgIdFront  = $request->hasFile('img_id_front') ? $request->file('img_id_front')->store('drivers', 'public') : null;
         $imgIdBack   = $request->hasFile('img_id_back') ? $request->file('img_id_back')->store('drivers', 'public') : null;
 
+        // ✅ الصور الجديدة للسيارة
+        $imgCarFront = $request->hasFile('img_car_front') ? $request->file('img_car_front')->store('drivers', 'public') : null;
+        $imgCarBack  = $request->hasFile('img_car_back') ? $request->file('img_car_back')->store('drivers', 'public') : null;
+
         // 3. إنشاء المستخدم
         try {
             $user = User::create([
-                'name'         => $request->name,
-                'phone'        => $request->phone,
-                'password'     => Hash::make($request->password),
-                'role'         => $request->role,
-                'status'       => $request->role === 'driver' ? 'pending' : 'active',
-                'balance'      => 0.00,
-                'img_personal' => $imgPersonal,
-                'img_id_front' => $imgIdFront,
-                'img_id_back'  => $imgIdBack,
-                'car_color'    => $request->car_color,
-                'car_plate'    => $request->car_plate,
+                'name'          => $request->name,
+                'phone'         => $request->phone,
+                'password'      => Hash::make($request->password),
+                'role'          => $request->role,
+                'status'        => $request->role === 'driver' ? 'pending' : 'active',
+                'balance'       => 0.00,
+
+                'img_personal'  => $imgPersonal,
+                'img_id_front'  => $imgIdFront,
+                'img_id_back'   => $imgIdBack,
+
+                // ✅ إضافة الحقول الجديدة
+                'img_car_front' => $imgCarFront,
+                'img_car_back'  => $imgCarBack,
+
+                'car_color'     => $request->car_color,
+                'car_plate'     => $request->car_plate,
+                'car_brand'     => $request->car_brand,
+                'car_model'     => $request->car_model,
+                'car_year'     => $request->car_year,
             ]);
 
             $token = $user->createToken('taxiToken')->plainTextToken;

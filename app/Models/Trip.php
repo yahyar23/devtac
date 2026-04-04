@@ -29,7 +29,12 @@ class Trip extends Model
         'is_paid',       // هل تم الدفع؟
         'status', 
         'started_at',    // وقت بدء الرحلة الفعلي
-        'ended_at'       // وقت نهاية الرحلة الفعلي
+        'ended_at',      // وقت نهاية الرحلة الفعلي
+        'receiver_name',      // وقت نهاية الرحلة الفعلي
+        'receiver_phone',      // وقت نهاية الرحلة الفعلي
+        'item_type',      // وقت نهاية الرحلة الفعلي
+        'item_price',      // وقت نهاية الرحلة الفعلي
+        'items_count',      // وقت نهاية الرحلة الفعلي
     ];
 
     /**
@@ -44,7 +49,6 @@ class Trip extends Model
         'distance'     => 'double',
         'is_paid'      => 'boolean',
         'started_at'   => 'datetime',
-        'ended_at'     => 'datetime',
     ];
 
     // ========================================================
