@@ -1,49 +1,42 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Livewire\Driver\Dashboard as DriverDashboard;
-use App\Http\Livewire\Admin\MainDashboard as AdminDashboard; // تم استيراد المكون الحقيقي
-
+use App\Http\Livewire\Admin\MainDashboard;
+use App\Http\Livewire\PlanEvaluator; // مسار مكون Livewire للفحص
+use App\Http\Livewire\Admin\SiteSettings;
 /*
 |--------------------------------------------------------------------------
 | المسارات العامة
 |--------------------------------------------------------------------------
 */
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 /*
+
+
 |--------------------------------------------------------------------------
 | المسارات المحمية (بعد تسجيل الدخول)
 |--------------------------------------------------------------------------
 */
+
+Route::get('/plan-print/{id}', function ($id) {
+    $plan = \App\Models\PatientPlan::findOrFail($id);
+    return view('reports.plan-print', compact('plan'));
+})->name('plan.print');
+Route::get('/', PlanEvaluator::class)->name('plan.evaluator');
 Route::middleware(['auth', 'verified'])->group(function () {
-
-    // 1. الموجه الذكي (The Router)
-    // هذا هو العقل المدبر الذي يوزع المستخدمين حسب رتبهم
+Route::get('/admin/settings', SiteSettings::class)->name('admin.settings');
+    // التوجيه التلقائي المباشر للوحة الأدمن
     Route::get('/dashboard', function () {
-        $role = auth()->user()->role;
-
-        if ($role === 'admin') {
-            return redirect()->route('admin.dashboard');
-        } elseif ($role === 'driver') {
-            return redirect()->route('driver.dashboard');
-        }
-        
-        return view('dashboard'); // للزبون العادي
+        return redirect()->route('admin.dashboard');
     })->name('dashboard');
 
-    // 2. لوحة تحكم السائق (صاحب البطاقة البنفسجية)
-    Route::get('/driver/dashboard', DriverDashboard::class)
-        ->name('driver.dashboard');
-
-    // 3. لوحة تحكم الأدمن (غرفة العمليات)
-    // قمنا بتغيير الـ Closure إلى المكون الحقيقي AdminDashboard
-    Route::get('/admin/dashboard', AdminDashboard::class)
+    // مسار لوحة تحكم الأدمن لتقييم العلاج الإشعاعي
+    Route::get('/admin/dashboard', MainDashboard::class)
         ->name('admin.dashboard');
-
 });
 
-// ملف مسارات Breeze (Login, Register, etc.)
+// مسارات المصادقة (Laravel Breeze / Fortify)
 require __DIR__.'/auth.php';

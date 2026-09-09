@@ -2,7 +2,7 @@
     <x-auth-card>
         <x-slot name="logo">
             <a href="/">
-                <div class="text-4xl font-bold text-purple-600 italic">MY TAXI</div>
+                <div class="text-4xl font-bold text-purple-600 italic">سجل دخولك</div>
             </a>
         </x-slot>
 
@@ -14,12 +14,12 @@
             @csrf
 
             <div>
-                <x-label for="phone" :value="__('رقم الهاتف')" class="text-right" />
+                <x-label for="email" :value="__('رقم الهاتف')" class="text-right" />
 
-                <x-input id="phone" class="block mt-1 w-full text-right" 
+                <x-input id="email" class="block mt-1 w-full text-right" 
                          type="text" 
-                         name="phone" 
-                         :value="old('phone')" 
+                         name="email" 
+                         :value="old('email')" 
                          placeholder="07xxxxxxxx"
                          required autofocus />
             </div>
